@@ -62,5 +62,5 @@ GET /_all/tweet/_search?q=tweet:elasticsearch
 
 当你索引一个文档，Elasticsearch把所有字符串字段值连接起来放在一个大字符串中，被索引为一个特殊的字段 _all 
 
-
+若没有指定字段，查询字符串搜索，(q=xxx)使用_all 字段进行搜索。
 
