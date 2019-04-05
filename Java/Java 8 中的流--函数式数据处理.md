@@ -98,4 +98,202 @@ List<String> uniqueCharacters =
 		.collect(Collectors.toList());
 ```
 
-使用flatMap方法的效果是，各个数组并不是分别映射成一个流，而是映射成流的内容。扁平化成一个流。
+使用flatMap方法的效果是，各个数组并不是分别映射成一个流，而是映射成流的内容。所有使用map(Arrays::Stream)时生成的单个流都被合并起来，即扁平化成一个流。
+
+flatmap 方法会让你把一个流中的每个值都换成另一个流，然后把所有的流连接起来成为一个流。
+
+#### 例子
+
+给定[1,2,3] 和 [3,4] 返回[(1,3), (1, 4), (2, 3)...]
+
+```Java
+List<Integer> number1 = Arrays.asList(1, 2, 3);
+List<Integer> number2 = Arrays.asList(3, 4);
+
+List<int[]> pairs = 
+    numbers1.stream()
+    		.flatMap(i -> numbers2.stream() 
+                    					.map(j -> new int[](i, j))) // 这一步返回的Stream<Integer[]>, 需要使用 flatMap扁平化处理
+    		.collect(toList());
+```
+
+在前一步的基础上，返回总和能被3整除的数对
+
+```Java
+List<Integer> number1 = Arrays.asList(1, 2, 3);
+List<Integer> number2 = Arrays.asList(3, 4);
+
+List<int[]> pairs = 
+    numbers1.stream()
+    		.flatMap(i -> numbers2.stream()
+                     					.filter(j -> (i + j) % 3 == 0)
+                    					.map(j -> new int[](i, j))) 
+    		.collect(toList());
+```
+
+### 查找和匹配
+
+Stream 通过allMatch 、anyMatch 、noneMatch、findFirst、findAny 方法
+
+anyMatch 是否有一个元素匹配
+
+allMatch 是否都匹配
+
+noneMatch 没有一个匹配
+
+**短路特性**
+
+findAny 返回任意一个
+
+findFirst 返回第一个元素
+
+**找到第一个元素在并行上限制很多，不关心返回元素是哪个，使用findAny，并行流时限制较少**
+
+### 归约
+
+#### 求和
+
+reduce操作将这种重复应用模式做了抽象
+
+```Java
+int sum = numbers.stream().reduce(0, (a, b) -> a + b);
+```
+
+reduce接收两个参数：一个是初始值，另一个是BinaryOperator
+
+Integer类中有一个静态的sum方法来对两个数求和
+
+```Java
+int sum = numbers.stream().reduce(0, Integer::sum);
+```
+
+reduce还有一个重载的变体，不接受初始值，但是会返回一个Optional对象
+
+```java
+Optional<Integer> sum = numbers.stream().reduce((a, b) -> (a + b));
+```
+
+#### 最大值最小值
+
+```Java
+Optional<Integer> max = numbers.stream().reduce(Integer::max);
+```
+
+**优势** 相比于迭代求和，使用reduce的好处在于，迭代被内部迭代抽象掉了，让内部实现得以选择并执行reduce。
+
+迭代式求和要更新共享变量sum，不容易实现并行化。
+
+```java
+int sum = numbers.parallelStream().reduce(0, Integer::sum);
+```
+
+传递给reduce的Lambda不能更改状态，且操作需要满足结合率
+
+**流操作：无状态和有状态**
+
+诸如map或者filter等操作 是无状态的
+
+诸如reduce、sum、max操作需要内部状态来累积结果
+
+诸如sort或者distinct 从流中排序和删除重复项时都需要知道先前的历史，是有状态的
+
+#### 实例
+
+去掉distinct，改用toSet()，这样会把流转换为集合
+
+返回所有交易员的姓名字符串，按照字母顺序排序
+
+```Java
+String traderStr = 
+    	transactions.stream()
+    				.map(transaction -> transaction.getTrade().getName())
+    				.distinct()
+    				.sorted()
+    				.reduce("", (n1, n2) -> n1 + n2);
+```
+
+注意，此解决方法效率不高（字符串反复连接，每次迭代都需要建立一个新的String对象）
+
+可以选择使用以下解决办法，内部使用了Stringbuilder
+
+```Java
+String traderStr = 
+    	transactions.stream()
+    				.map(transaction -> transaction.getTrade().getName())
+    				.distinct()
+    				.sorted()
+    				.collect(joining());
+```
+
+### 数值流
+
+使用Integer::sum 问题在于暗含的装箱成本，使用IntStream DoubleStream LongStream 避免了暗含的装箱成本。
+
+```Java
+int calories = menu.stream()
+    			.mapToInt(Dish::getCalories)
+    			.sum();
+```
+
+mapToInt 返回一个IntStream
+
+将原始流转换为一般流（每个int都会装箱成一个Integer），可以使用boxed方法
+
+```Java
+IntStream intStream = menu.stream().mapToInt(Dish::getCalories);
+Stream<Integer> stream = intStream.boxed();
+
+```
+
+OptionalInt 区分没有元素的流和最大值真的是0的流
+
+```Java
+OptionalInt maxCalories = menu.stream()
+    							.mapToInt(Dish::getCalories)
+    							.max();
+```
+
+range 和rangeClosed生成范围
+
+```Java
+IntStream evenNumbers = IntStream.rangeClosed(1, 100)
+								.filter(n -> n % 2 == 0);
+```
+
+#### 勾股数
+
+```Java
+Stream<double[]> pythagoreanTriples2 = 
+    IntStream.rangeClosed(1, 100).boxed()
+    			.flatMap(a -> 
+                        IntStream.rangeClosed(a, 100)
+                        			.mapToObj(
+                                    		b -> new Double[] {a, b, Math.sqrt(a *a + b * b )}).filter(t ->  t[2] % 1 == 0));
+```
+
+### 创建流
+
+Stream.of 静态方法显示创建一个流
+
+由数组创建流 Arrays.stream(numbers)
+
+由文件生成流 Files.lines
+
+```Java
+long uniqueWords = 0;
+try(Stream<String> lines = Files.lines(Paths.get("data.txt"), Charset.defaultCharset())){
+    uniqueWords = lines.flatMap(line -> Arrays.stream(line.split(" ")))
+        .distinct().count();
+}catch(IOException){
+    
+}
+```
+
+你可以使用Files.lines得到一个流，其中的每个元素都是给定文件中的一行 可以对line调用split方法将行拆分成单词。应该注意的是，你该如何使用flatMap产生一个扁平的单词流，而不是给每一行生成一个单词流。最后，把distinct和count方法链接起来，数数流中有多少各不相同的单词。 
+
+#### 由函数生成无限流
+
+Stream.iterate 和 Stream.generate, 一般来说使用limit进行限制，避免无穷打印
+
+
+
