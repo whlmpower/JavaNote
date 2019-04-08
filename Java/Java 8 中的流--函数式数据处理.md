@@ -295,5 +295,41 @@ try(Stream<String> lines = Files.lines(Paths.get("data.txt"), Charset.defaultCha
 
 Stream.iterate 和 Stream.generate, 一般来说使用limit进行限制，避免无穷打印
 
+**迭代**
 
+```Java
+Stream.iterate(0, n -> n + 2)
+    		.limit(10).forEach(System.out::println);
+```
+
+iterate 接收一个初始值，和一个Lambda(unaryOperator<t> 类型)
+
+```Java
+Stream.iterate(new int[]{0, 1},
+t -> new int[]{t[1],t[0] + t[1]})
+.limit(10)
+.map(t -> t[0])
+.forEach(System.out::println);
+```
+
+**生成**
+
+generate 接收一个Supplier<T> 类型的Lambda
+
+```Java
+IntSupplier fib = new IntSupplier(){
+	private int previous = 0;
+	private int current = 1;
+	public int getAsInt(){
+	int oldPrevious = this.previous;
+	int nextValue = this.previous + this.current;
+	this.previous = this.current;
+	this.current = nextValue;
+	return oldPrevious;
+	}
+};
+IntStream.generate(fib).limit(10).forEach(System.out::println);
+```
+
+此段代码创建了一个IntSupplier的实例，此对象有可变的状态。它在两个实例变量中记录了前一个斐波纳契项和当前的斐波纳契项。 getAsInt在调用时会改变对象的状态，由此在每次调用时产生新的值。相比之下， 使用iterate的方法则是纯粹不变的：它没有修改现有状态，但在每次迭代时会创建新的元组。 
 
