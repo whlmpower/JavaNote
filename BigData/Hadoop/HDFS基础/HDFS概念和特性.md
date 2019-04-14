@@ -116,5 +116,125 @@ nameNode 的工作目录应该配置在多个磁盘上，同时往两块磁盘�
 
 namenode和secondary namenode的工作目录存储结构完全相同，所以，当namenode故障退出需要重新恢复时，可以从secondary namenode的工作目录中将fsimage拷贝到namenode的工作目录，以恢复namenode的元数据
 
+### 元数据目录说明
+
+在第一次部署好Hadoop集群的时候，我们需要在NameNode（NN）节点上格式化磁盘：
+
+```shell
+$HADOOP_HOME/bin/hdfs namenode -format
+```
+
+格式化完成之后，将会在$dfs.namenode.name.dir/current目录下如下的文件结构
+
+```shell
+current/
+|-- VERSION
+|-- edits_*
+|-- fsimage_0000000000008547077
+|-- fsimage_0000000000008547077.md5
+`-- seen_txid
+
+```
+
+其中的dfs.name.dir是在hdfs-site.xml文件中配置的，默认值如下：
+
+```shell
+<property>
+  <name>dfs.name.dir</name>
+  <value>file://${hadoop.tmp.dir}/dfs/name</value>
+</property>
+
+hadoop.tmp.dir是在core-site.xml中配置的，默认值如下
+<property>
+  <name>hadoop.tmp.dir</name>
+  <value>/tmp/hadoop-${user.name}</value>
+  <description>A base for other temporary directories.</description>
+</property>
+
+```
+
+nameNode 可以配置多个目录，中间使用逗号隔开，各个目录存储的文件结构和内容完全一样，相当于备份，这样的好处在于其中的一个目录损坏了，也不会影响到Hadoop的元数据。
+
+对于$dfs.namenode.name.dir/current/目录下的文件进行解释：
+
+1. VERSION 文件是Java属性文件，其内容大致为
+
+```shell
+#Fri Nov 15 19:47:46 CST 2013
+namespaceID=934548976
+clusterID=CID-cdff7d73-93cd-4783-9399-0a22e6dce196
+cTime=0
+storageType=NAME_NODE
+blockpoolID=BP-893790215-192.168.24.72-1383809616115
+layoutVersion=-47
+
+```
+
+（1）namespaceID 是文件系统的唯一标识符，在文件系统首次格式化之后生成的
+
+（2）storageType说明这个文件存储的什么进程的数据结构信息（DataNode， storageType=DATA_NODE）
+
+（3）CTime表示NameNode存储时间的创建时间，每次NameNode进行更新后，都会记录更新时间戳
+
+（4）layoutVersion表示HDFS永久性数据结构的版本信息，只要数据结构变更，版本号也要递减，此时的HDFS也需要升级，否则磁盘仍旧使用的旧版本的数据结构，这会导致新版本的NameNode无法使用。
+
+（5）clusterID是系统或手动指定的集群ID，在-clusterId选项中可以使用它
+
+（6）blockpoolID：是针对每一个Namespace所对应的blockpool的ID，上面的这个BP-893790215-192.168.24.72-1383809616115就是在我的ns1的namespace下的存储块池的ID，这个ID包括了其对应的NameNode节点的ip地址。
+
+**关于clusterID的指定：**
+
+a、使用如下命令格式化一个Namenode：
+
+$HADOOP_HOME/bin/hdfs namenode -format [-clusterId <cluster_id>]
+
+选择一个唯一的cluster_id，并且这个cluster_id不能与环境中其他集群有冲突。如果没有提供cluster_id，则会自动生成一个唯一的ClusterID。
+
+b、使用如下命令格式化其他Namenode：
+
+ $HADOOP_HOME/bin/hdfs namenode -format -clusterId <cluster_id>
+
+c、升级集群至最新版本。在升级过程中需要提供一个ClusterID，例如：
+
+$HADOOP_PREFIX_HOME/bin/hdfs start namenode --config $HADOOP_CONF_DIR  -upgrade -clusterId <cluster_ID>
+
+如果没有提供ClusterID，则会自动生成一个ClusterID。
+
+**关于seen_txid:**
+
+$dfs.namenode.name.dir/current/seen_txid非常重要，是存放transactionId的文件，format之后是0，它代表的是nameNode里面edits_*文件的尾数，nameNode重启的时候，会按照seen_txid的数字，循环从头跑edits_0000001~seen_txid的数字，所以当你的hdfs发生异常重启的时候，一定要对比seen_txid内的数字是不是你edits最后的尾数，不然会发生重建nameNode时metaData的资料有缺失，导致误删DataNode上多余的Block的资讯。 **seen_txid**中记录的是edits滚动的序号，每次重启nameNode时，nameNode就知道要将哪些edits进行加载。
+
+$dfs.namenode.name.dir/current目录下在format的同时，也会生成fsimage和edits文件，及其对应的md5校验文件。
+
+## 6.DataNode的工作机制
+
+### DataNode的工作职责
+
+存储管理用户的文件块数据，定期向nameNode汇报自身所持有的block信息（通过心跳进行上报）
+
+### DataNode掉线判断时限参数
+
+dataNode进程死亡或者网络故障造成dataNode无法与nameNode通信，nameNode不会立即把该节点判定为死亡，要经过一段时间，这段时间暂称为超时时长。HDFS默认的超时时长为10分钟+30秒。如果定义了超时时间timeOut，则超时时长的计算公式为
+
+```mathematica
+	timeout  = 2 * heartbeat.recheck.interval + 10 * dfs.heartbeat.interval
+```
+
+而默认的heartbeat.recheck.interval 大小为5分钟，dfs.heartbeat.interval默认为3秒
+
+需要注意的是hdfs-site.xml 配置文件中的heartbeat.recheck.interval的单位为毫秒，dfs.heartbeat.interval的单位为秒。所以，举个例子，如果heartbeat.recheck.interval设置为5000（毫秒），dfs.heartbeat.interval设置为3（秒，默认），则总的超时时间为40秒
+
+```xml
+<property>
+        <name>heartbeat.recheck.interval</name>
+        <value>2000</value>
+</property>
+<property>
+        <name>dfs.heartbeat.interval</name>
+        <value>1</value>
+</property>
+
+```
+
 
 
