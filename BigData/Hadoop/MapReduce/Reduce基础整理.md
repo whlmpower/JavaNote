@@ -118,6 +118,41 @@ reduceTask数量并不可以任意设置，需要考虑业务需求，有些情�
 
 mapreduce 在集群上运行的大体流程
 
+## 客户端提交Job的流程
+
+![客户端提交mr程序job的流程](E:\MyNote\ToGitHub\BigData\Hadoop\MapReduce\image\客户端提交mr程序job的流程.png)
+
+1.jobWaitForCompletion() 调用job.submit( ) 调用JobSubmiter,
+
+2.JobSubmiter 成员Cluster，Cluster也有一个成员Proxy
+
+3.最后提交到yarn上面，这时创建的Proxy为YarnRunner；提交到本地（MR 程序运行模拟器）,创建的Proxy为LocalJobRunner
+
+4.通过Runner拿到提交资源的路径，StagingDir--> File:/.../.staging ;  hdfs:// ..../.staging  
+
+5.拿到JobID，连接StagingDir，拼接成Job资源提交路径  hdfs:// ..../.staging /jobid
+
+6.将Job资源提交到对应的目录：切片的规划（调用FileInputFormat.getSplit()，得到List<FileSplit>, 序列化成文件）
+
+7.将Job相关参数写Job.xml文件，将文件上传到对应Job提交路径
+
+8.将获取程序Job的Jar 包(Main() 方法中setJobClass() 方法)进行提交
+
+## MapReduce中的Combiner
+
+1. Combiner 是MR程序中Mapper和Reducer之外的一种组件
+
+2. Combiner组件的父类是Reducer
+
+3. Combiner和Reducer的区别在于运行的位置
+
+   Combiner是在每一个MapTask所在的节点运行
+
+   Reducer是接收全局所有Mapper的输出结果
+
+4. Combiner的意义在于对每一个mapTask的输出进行局部汇总，以减少网络传输量（自定义Combiner继承Reducer，重写Reduce方法；在job中设置，job.setCombinerClass）
+
+5. Combiner能够应用的前提是不能影响最终的业务逻辑，而且Combiner的输出KV应该跟Reducer的输入KV类型要对应起来。
 
 
- 
+
