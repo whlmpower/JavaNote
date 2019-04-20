@@ -30,5 +30,5 @@ YARN是一个资源调度平台，负责为运算程序提供服务器运算资�
 9. NodeManager领取到任务，创建两个Container，默认进程名字叫YARNChild
 10. MRAPPMaster发送程序启动脚本，mapTask启动成功，MRAPPMaster实时进行监控、重新启动等，mapTask处理成功后，在本地生成分区文件
 11. MRAPPMaster 向RM申请3个容器，运行ReduceTask程序，进程默认也叫yarnChild
-12. reduce想map端获取相应分区的数据，使用mapReduce_shuffle组件
+12. reduce向map端获取(主要通过NodeManager)相应分区的数据，使用mapReduce_shuffle组件
 13. application运行完毕后，MRAPPMaster会向RM注销自己。
