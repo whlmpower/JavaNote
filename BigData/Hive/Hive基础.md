@@ -72,5 +72,117 @@ CREATE [EXTERNAL] TABLE [IF NOT EXISTS] table_name
 6. Clustered by
 
    对于每一个表（table）或者分区，Hive可以进一步组织成为桶，桶是更为细粒度的数据范围划分。Hive也是针对某一列进行桶的组织。Hive采用对列hash，然后除以桶的个数求余的方式决定了该条记录存放在哪个桶当中。
-
    
+   将表(或者是分区)组织成桶有两个理由：
+   
+   (1)获得更高的查询处理效率。桶为表加上了额外的结构，Hive在处理有些查询时能够利用这个机构。具体而言，连接两个在(包含连接列)相同列上划分了桶的表，可以使用Map端连接（Map-side join）高效的表现。Join操作时，对于Join操作两个表有一个相同的列，如果对这两个表都进行了桶操作。那么将保存相同列值的桶进行Join操作就可以，可以大大减少Join的数据量。
+   
+   (2)使取样（sampling）更高效。在处理大规模数据集的时候，在开发和修改查询的阶段，如果能在数据集的一小部分数据上试运行查询，就会带来很大的方便。
+
+#### 修改表
+
+**增加删除分区**
+
+
+
+**重命名表**
+
+ALTER TABLE table_name RENAME TO new_table_name
+
+**增加更新列**
+
+ADD是代表新增一字段，字段位置在所有列后面（partition 列前面）,Replace 则是表示替换表中所有字段。
+
+**显示命令**
+
+show tables
+
+show databases
+
+show partitions
+
+show functions
+
+desc extended t_name;
+
+desc formatted table_name;
+
+### DDL操作
+
+**Load**
+
+Load 操作只是单纯的复制/移动操作，将数据文件移动到 Hive 表对应的位置。
+
+Local：如果指定了 LOCAL， load 命令会去查找本地文件系统中的 filepath；如果没有指定 LOCAL 关键字，则根据inpath中的uri[[M1\]](#_msocom_1) 查找文件
+
+------
+
+
+
+如果指定了 LOCAL，那么： 
+
+load 命令会去查找本地文件系统中的 filepath。如果发现是相对路径，则路径会被解释为相对于当前用户的当前路径。 
+
+load 命令会将 filepath中的文件复制到目标文件系统中。目标文件系统由表的位置属性决定。被复制的数据文件移动到表的数据对应的位置。
+
+ 
+
+如果没有指定 LOCAL 关键字，如果 filepath 指向的是一个完整的 URI，hive 会直接使用这个 URI。 否则：如果没有指定 schema 或者 authority，Hive 会使用在 hadoop 配置文件中定义的 schema 和 authority，fs.default.name 指定了 Namenode 的 URI。 
+
+如果路径不是绝对的，Hive 相对于/user/进行解释。 
+
+Hive 会将 filepath 中指定的文件内容移动到 table （或者 partition）所指定的路径中。
+
+**OverWrite 关键字**
+
+如果使用了 OVERWRITE 关键字，则目标表（或者分区）中的内容会被删除，然后再将 filepath 指向的文件/目录中的内容添加到表/分区中。 
+
+如果目标表（分区）已经有一个文件，并且文件名和 filepath 中的文件名冲突，那么现有的文件会被新文件所替代。 
+
+**INSERT**
+
+将查询结果插入到Hive表
+
+导出表数据
+
+1. 导出文件到本地
+2. 导出数据到HDFS
+
+**SELECT**
+
+基本SELECT操作
+
+```sql
+SELECT [ALL | DISTINCT] select_expr, select_expr, ... 
+FROM table_reference
+[WHERE where_condition] 
+[GROUP BY col_list [HAVING condition]] 
+[CLUSTER BY col_list 
+  | [DISTRIBUTE BY col_list] [SORT BY| ORDER BY col_list] 
+] 
+[LIMIT number]
+
+```
+
+1. Order by 会对输入全局做排序，因此只有一个Reducer，会导致当输入规模较大时，需要较长的计算时间，一般使用limit进行短路
+2. Sort By不是全局排序，其在数据进入到Reducer前完成排序。因此，如果用sort by进行排序，并且设置mapred.reduce.task>1，则sort by只保证每个reducer的输出有序，不保证全局有序。
+3. distribute by根据distribute by指定的内容将数据分到同一个reducer
+4. Cluster by除了具有Distribute By的功能外，还会对该字段进行排序，因此，常常任务cluster by = distribute by + sort by
+
+### Hive Join
+
+```sql
+join_table:
+  table_reference JOIN table_factor [join_condition]
+  | table_reference {LEFT|RIGHT|FULL} [OUTER] JOIN table_reference join_condition
+  | table_reference LEFT SEMI JOIN table_reference join_condition
+
+```
+
+Hive
+支持等值连接（equality
+joins）、外连接（outer joins）和（left/right
+joins）。Hive **不支持非等值的连接**，因为非等值连接非常难转化到 map/reduce 任务。
+
+
+
