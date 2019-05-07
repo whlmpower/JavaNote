@@ -169,3 +169,11 @@ HBASE使用MEMStore和StoreFile存储对表的更新，数据在更新的时候�
 4. RegionServer的内存分为MEMStore和BlockCache两个部分，MEMStore主要用于写数据，BlockCache主要用于读数据。读请求先到MEMStore中查数据，查不到就到BlockCache中查，查不到就到StoreFile上读，并把读的结果放入到BlockCache
 
 寻址过程：client-->Zookeeper-->-ROOT-表-->.META.表-->RegionServer-->Region-->client
+
+## 参考
+
+https://blog.csdn.net/qq285016127/article/details/80808748
+
+https://www.cnblogs.com/steven-note/p/7209398.html
+
+https://www.cnblogs.com/csyuan/p/6543018.html
