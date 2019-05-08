@@ -61,3 +61,15 @@ Spout/Bolt：开人员中的两种角色，一种是服务器开发、一种是�
 反之，一个topology中包含多个worker，其实这个topology运行在多个worker上
 
 一个topology要求的worker数量如果不被满足，集群在任务分配时，根据现有的worker先运行topology。如果当前集群中worker数量为0，那么最新提交的topology将只会被标识为active，不会运行，只有当集群中有了充足的资源后，才会运行。
+
+# Storm 程序执行流程
+
+![Storm运行过程](.\image\Storm运行过程.png)
+
+1. 客户端运行Storm jar xxx.jar 驱动类
+2. nimbus进行任务分配，获取空闲的worker，分配任务
+3. topology任务信息，总的task数量（相加），每个Worker获得任务数（相除），task分配以一种轮询的方式进行
+4. supervisor 启动work（根据端口号）
+5. DataSource发送给多个Spout，Spout发送给集群中的Blot（紫色线条）
+6. Blot1进行单词切分
+7. 单词根据Fields Grouping，一种hash方式将对应的单词emit发射给指定的blot2
