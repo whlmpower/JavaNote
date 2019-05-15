@@ -8,11 +8,13 @@ Kafka是一个生产-消费模型。
 
 Producer：生产者，只负责数据生产，生产者的代码可以集成到任务系统中。
 
-Broker：当前服务器上的Kafka进程，只负责数据的存储，不关心数据的生产者和数据消费者。
+Broker：当前服务器上的Kafka进程，只负责数据的存储，不关心数据的生产者和数据消费者。每个Cluster当中会选举出一个Broker来担任Controller，负责处理Partition的Leader选举，协调Partition迁移等工作。
 
 Topic：目标发送的目的地（消息主题），这是一个逻辑上的概念，对应落实在磁盘上是一个partition的目录。partition的目录中有多个segment组合（index, log）。一个Topic对应多个partition[0,1,2,3]，一个partition对应多个segment组合，一个segment的默认大小为1G。每个partition可以设置多个副本（replication-factor  1），会从所有副本中选取一个leader出来，所有的读写操作都是通过leader进行的。特别强调，和mysql中主从有区别，mysql做主从主要是为了读写分离，在kafka中的读写都是leader中进行的。
 
 ConsumerGroup：数据消费者组，一个topic可以有多个ConsumerGroup。topic的消息会复制（不是真的复制，只是逻辑上的复制）到所有的ConsumerGroup，但是每个partition只会把消息发送给该CG中的一个consumer。可以把多个consumer线程分为一个组，组内的所有成员共同消费通一个topic的数据，组员之间不能够重复消费。如果要实现广播，只要每一个consumer有一个独立的CG就可以了，如果要实现单播，只要所有的consumer在同一个CG。
+
+ISR（In-Sync Replica）：是Replicas的一个子集，表示目前Alive且与Leader能够进行"Catch-up"的Replicas的集合。由于读写都是首先落到Leader上，所以一般来说通过同步机制从Leader上拉取的Replica都会和Leader有一些延迟（包括延迟时间和延迟条数两个维度），任意一个超过阈值都会把该Replica踢出ISR。每个partition都有自己独立的ISR。
 
 ## Kafka生产数据时的分组策略
 
@@ -35,6 +37,14 @@ ack机制：broker表示标识发送来的数据已确认接收无误，表示�
 ## broker如何保存数据
 
 在理论环境下，broker按照顺序读写机制，可以每秒保存600M的数据。主要通过pagecache机制，尽可能的利用当前物理机器上的空闲内存来做缓存。当前topic所属的broker，必定有一个该topic的partition，partition是一个磁盘目录。partition的目录中有多个segment组合（index,log）。
+
+Kafka重度依赖底层提供的PageCache功能，当上层有写操作时，操作系统只是将数据写入到PageCache，同时标记Page属性为Dirty。
+
+当读操作发生时，先从PageCache中查找，如果发生缺页才进行磁盘调度，返回需要的数据。实际上pageCache是把尽可能多的空闲内存都当做了磁盘缓存来使用。
+
+SendFile机制，简化了整个IO过程
+
+![SendFile](.\image\SendFile.png)
 
 ## partition如何分布在不同的broker上
 
