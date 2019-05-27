@@ -15,7 +15,7 @@ YARN是一个资源调度平台，负责为运算程序提供服务器运算资�
 
 
 
-![mapreduce&yarn的工作机制----吸星大法](./image/mapreduce&yarn的工作机制----吸星大法.png)
+![mapreduce&yarn的工作机制----吸星大法](.\image\mapreduce&yarn的工作机制----吸星大法.png)
 
 
 
