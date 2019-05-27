@@ -6,7 +6,7 @@ MapReduce中，map阶段处理的数据如何传递给Reduce阶段，是MapReduc
 
 
 
-![mapreduce原理全剖析--段氏六脉神剑](.\image\mapreduce原理全剖析--段氏六脉神剑.png)
+![mapreduce原理全剖析--段氏六脉神剑](./image/mapreduce原理全剖析--段氏六脉神剑.png)
 
 ### shuffle 主要流程
 
